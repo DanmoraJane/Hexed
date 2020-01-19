@@ -9,13 +9,13 @@ private Player player;
 
     void Start()
     {
-        player = GameObject.FindGameObjectWithTag("player").GetComponent<Player>();
+        player = GameObject.FindGameObjectWithTag("Player").GetComponent<Player>();
 
     }
 
     void OnTriggerEnter2D(Collider2D collider)
     {
-        if (collider.CompareTag("player"))
+        if (collider.CompareTag("Player"))
         {
             player.Damage(1);
 

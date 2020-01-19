@@ -5,10 +5,9 @@ using UnityEngine.Events;
 
 public class Player : MonoBehaviour
 {
-
     //movement variables
-    public float moveSpeed;
-    public bool facingRight;
+    public float moveSpeedPlayer;
+    private bool facingRight;
 
     //jumping variables
     public float jumpY = 5f;
@@ -17,62 +16,57 @@ public class Player : MonoBehaviour
     public bool jumpCheck;
     public bool canDoubleJump;
 
-
-    //health
-    public int maxHealth = 3;
-    public int health;
-
     //references
     private Rigidbody2D body;
     private GameMaster gm;
     public Animator animator;
 
+    [SerializeField] private Stats hp;
+    [SerializeField] private Stats mp;
+
     // Start is called before the first frame update
     void Start()
     {
-
         facingRight = true;
-
         body = gameObject.GetComponent<Rigidbody2D>();
-
-        health = maxHealth;
-
+        hp.Initialize(100, 100);
+        mp.Initialize(100, 100);
         gm = GameObject.FindGameObjectWithTag("GameMaster").GetComponent<GameMaster>();
-
-      
     }
 
     // Update is called once per frame
     void Update()
     {
-        Vector3 movement = new Vector3(Input.GetAxis("Horizontal"), 0.0f, 0.0f);
-        float horizontal = Input.GetAxis("Horizontal");
 
-        animator.SetFloat("Speed", Mathf.Abs(horizontal));
+        animator.SetFloat("Speed", Mathf.Abs(Input.GetAxis("Horizontal")));
         animator.SetBool("GroundCheck", groundCheck);
         animator.SetBool("FallCheck", fallCheck);
         animator.SetBool("JumpCheck", jumpCheck);
 
-        //move the character
-        transform.position += movement * Time.deltaTime * moveSpeed;
+        SetAnimationState();
+
+        if (transform.position.y < -6)
+            hp.MyCurVal = 0;
+        
+        if (hp.MyCurVal <= 0)
+            Die();
+    }
+
+    void FixedUpdate()
+    {
+
+        Move(Input.GetAxis("Horizontal"));
 
         Jump();
 
-        SetAnimationState();
-        
-        Flip(horizontal);
+        Flip(Input.GetAxis("Horizontal"));
+    }
 
-        if (transform.position.y < -6)
-            health = 0;
-
-        if (health > maxHealth)
-            health = maxHealth;
-
-        if (health < 0)
-            health = 0;
-        
-        if (health <= 0)
-            Die();
+    void Move(float horizontal)
+    {
+        Vector2 moveVelocity = body.velocity;
+        moveVelocity.x = horizontal * moveSpeedPlayer;
+        body.velocity = moveVelocity;
     }
 
     void Jump()
@@ -113,12 +107,12 @@ public class Player : MonoBehaviour
 
     void Die()
     {
-        Application.LoadLevel(Application.loadedLevel);
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
     }
 
     public void Damage(int damage)
     {
-        health -= damage;
+        hp.MyCurVal -= damage;
         gameObject.GetComponent<Animation>().Play("Player_Damage");
     }
 
@@ -129,7 +123,7 @@ public class Player : MonoBehaviour
         while (kbDuration > timer)
         {
             timer += Time.deltaTime;
-            body.AddForce(new Vector3(kbDirection.x * -30, kbDirection.y + kbPower, transform.position.z));
+            body.AddForce(new Vector3(kbDirection.x * -70, kbDirection.y + kbPower, transform.position.z));
         }
             
         yield return 0;
@@ -138,16 +132,12 @@ public class Player : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D collider)
     {
-
         if (collider.CompareTag("coin") && collider.gameObject.GetComponent<BoxCollider2D>().enabled)
         {
-            
             collider.gameObject.GetComponent<BoxCollider2D>().enabled = false;
             Destroy(collider.gameObject);
             gm.coins += 1;
-
         }
-
     }
 
     void SetAnimationState()

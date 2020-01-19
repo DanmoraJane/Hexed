@@ -4,33 +4,36 @@ using UnityEngine;
 
 public class Enemy : MonoBehaviour
 {
-    public float moveSpeed;
+    public float moveSpeedEnemy;
     public float range;
     public float groundRange;
 
-    private float nowSpeed;
+    private float attackTimer;  //timed attack animation
+    private float nowSpeed;     //current speed to pass to animator
     private bool facingRight = true;
     private bool playerNear = false;
 
+    private Player player;
+    private Rigidbody2D body;
 
     public Transform enemyGroundCheck;     //checks ground for collision
     public Transform playerTarget;         //retrieves player position
     public Animator enemyAnimator;         //retrives enemy Animator
-
-    public Player player;                  //accesses player script
-
+    
     void Start()
     {
         Physics2D.queriesStartInColliders = false;
 
-        playerTarget = GameObject.FindGameObjectWithTag("player").GetComponent<Transform>();       
+        playerTarget = GameObject.FindGameObjectWithTag("Player").GetComponent<Transform>();
+
+        player = GameObject.FindGameObjectWithTag("Player").GetComponent<Player>();   
+
+        body = gameObject.GetComponent<Rigidbody2D>();
 
     }
 
     void Update()
     {
-        //enemy detection range
-        Collider2D visionInfo = Physics2D.OverlapCircle(transform.position, range);
 
         //ray from enemy to player to see if he sees the player
         Vector3 direction = (playerTarget.position - transform.position).normalized;
@@ -39,13 +42,17 @@ public class Enemy : MonoBehaviour
 
         //check if there's ground
         RaycastHit2D groundInfo = Physics2D.Raycast(enemyGroundCheck.position, Vector2.down, groundRange);
-        //check fi there's an obstacle
+        //check if there's an obstacle
         RaycastHit2D hitInfo = Physics2D.Raycast(transform.position, transform.right, 0.5f);
+
+        //wait before attacking
+        if(attackTimer <= 0f) attackTimer = 1f;
 
         //animator variables
         enemyAnimator.SetFloat("Speed", nowSpeed);
         enemyAnimator.SetBool("GroundInfo", groundInfo);
         enemyAnimator.SetBool("PlayerNear", playerNear);
+
 
         //behaviour when no player in sight
         Patrol(hitInfo, groundInfo);
@@ -53,51 +60,53 @@ public class Enemy : MonoBehaviour
         Debug.DrawRay(enemyGroundCheck.position, Vector2.down, Color.blue);
         
         //behaviour with player in sight
-        DetectPlayer(visionInfo, playerInfo, groundInfo, hitInfo);
+        DetectPlayer(range, playerInfo, groundInfo, hitInfo);
+
+        Attack(playerNear);
+
+        //Debug.Log(playerNear);
+        //if (playerInfo.collider)
+        //    Debug.Log(playerInfo.collider.gameObject.name);
+        // if (hitInfo.collider)
+        //    Debug.Log(hitInfo.collider.gameObject.name);
+            
+
 
     }
 
-    public void DetectPlayer(Collider2D visionInfo, RaycastHit2D playerInfo, RaycastHit2D groundInfo, RaycastHit2D hitInfo){
-        if (visionInfo.CompareTag("player")){
-            Debug.Log("In range");
-            if (playerInfo.collider){
-                if (playerInfo.collider.CompareTag("player") && groundInfo.collider == true && !hitInfo.collider){
-                Debug.Log("In range and follows");
-                nowSpeed = (moveSpeed + 1) * Time.deltaTime;
-                transform.position = Vector2.MoveTowards(transform.position, playerTarget.position, nowSpeed);
-                
-            } else if (playerInfo.collider.CompareTag("player") && groundInfo.collider == false || playerInfo.collider.CompareTag("player") && hitInfo.collider.CompareTag("ground")){
-                Debug.Log("In range and sees");
-                nowSpeed = 0 * Time.deltaTime;
-                transform.Translate(Vector2.right * nowSpeed);
-            }
+    private bool IsPlayerInRange(float range)
+    {
+        return Vector3.Distance(transform.position, playerTarget.position) <= range;
+    }
 
-            if (playerInfo.collider.CompareTag("player") && groundInfo.collider == true || playerInfo.collider.CompareTag("player") && groundInfo.collider == false){
-                if(playerTarget.position.x > transform.position.x){
-                    transform.eulerAngles = new Vector3 (0, 0, 0);
-                } else if (playerTarget.position.x < transform.position.x) {
-                    transform.eulerAngles = new Vector3 (0, -180, 0);
+
+    public void DetectPlayer(float range, RaycastHit2D playerInfo, RaycastHit2D groundInfo, RaycastHit2D hitInfo){
+            if (IsPlayerInRange(range)){
+                if (playerInfo.collider){
+                    //follows if in range and sees player and there's no obstacle
+                    if (playerInfo.collider.CompareTag("PlayerAttack") && groundInfo.collider == true && hitInfo.collider == false){
+                        nowSpeed = (moveSpeedEnemy + 1) * Time.deltaTime;
+                        transform.position = Vector2.MoveTowards(transform.position, playerTarget.position, nowSpeed);
+                        FlipFollow();
+                        } //if sees player but can't get access to him (obstacle/dump)
+                        else if (playerInfo.collider.CompareTag("PlayerAttack") && groundInfo.collider == false || playerInfo.collider.CompareTag("PlayerAttack") && hitInfo.collider.CompareTag("ground")){
+                        nowSpeed = 0 * Time.deltaTime;
+                        transform.Translate(Vector2.right * nowSpeed);
+                        FlipFollow();
+                        }
                 }
             }
-            }
-            
-        }
     }
 
     private void Patrol(RaycastHit2D hitInfo, RaycastHit2D groundInfo){
-        if (hitInfo.collider != null){
-            if (groundInfo.collider == true && hitInfo.collider.CompareTag("ground") )
-            {
+            if (groundInfo.collider == true && groundInfo.collider.CompareTag("ground")){
+                nowSpeed = moveSpeedEnemy * Time.deltaTime;
+                transform.Translate(Vector2.right * nowSpeed);
+            }
+            else if (groundInfo.collider == false || groundInfo.collider.CompareTag("spikes") || hitInfo.collider == true && hitInfo.collider.CompareTag("ground")){
                 Flip();
             }
-        } else {
-            if (groundInfo.collider == false || groundInfo.collider.CompareTag("spikes")) { 
-                Flip();
-            } else {
-                nowSpeed = moveSpeed * Time.deltaTime;
-                transform.Translate(Vector2.right * nowSpeed);
-            }  
-        }
+
     }
 
     private void Flip(){
@@ -108,21 +117,43 @@ public class Enemy : MonoBehaviour
                 transform.eulerAngles = new Vector3 (0, 0, 0);
                 facingRight = true;
             }
+            
+    }
+
+    private void FlipFollow(){
+        if(playerTarget.position.x > transform.position.x){
+            transform.eulerAngles = new Vector3 (0, 0, 0);
+        } else if (playerTarget.position.x < transform.position.x) {
+            transform.eulerAngles = new Vector3 (0, -180, 0);
+        }
     }
 
     void OnTriggerEnter2D(Collider2D collider){
-        if (collider.CompareTag("player")){
+        if (collider.gameObject.CompareTag("PlayerAttack"))
+        {
             playerNear = true;
-        }         
+        }
     }
 
     void OnTriggerExit2D(Collider2D collider){
-        if (collider.CompareTag("player"))
+        if (collider.gameObject.tag != "PlayerAttack")
         {
             playerNear = false;
         }
-            
     }
+
+    void Attack(bool playerNear){
+        if (playerNear){
+            if(attackTimer > 0f){
+                attackTimer -= Time.deltaTime;
+                    if(attackTimer <= 0f){
+                        player.Damage(10);
+                        attackTimer = 0f;
+                    }
+            }
+        }
+    }
+
 
 
     void OnDrawGizmos()

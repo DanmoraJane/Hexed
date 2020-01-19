@@ -10,6 +10,12 @@ public class GameMaster : MonoBehaviour
 
     public Text coinsText;
 
+    public static GameMaster instance;
+
+    void OnAwake()
+    {
+        instance = this;
+    }
 
     void Update()
     {

@@ -28,7 +28,7 @@ public class GrayCircle : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (target == null) target = GameObject.FindGameObjectWithTag("player");
+        if (target == null) target = GameObject.FindGameObjectWithTag("Player");
         updateShader();
         toggleShader();
     }
